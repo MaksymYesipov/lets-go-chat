@@ -1,0 +1,10 @@
+# github.com/MaksymYesipov/hasher v0.0.0-20211115171608-25aa27364d90
+## explicit; go 1.17
+github.com/MaksymYesipov/hasher/hasher
+# github.com/google/uuid v1.3.0
+## explicit
+github.com/google/uuid
+# golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa
+## explicit; go 1.17
+golang.org/x/crypto/bcrypt
+golang.org/x/crypto/blowfish
