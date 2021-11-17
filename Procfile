@@ -1,1 +1,1 @@
-web: lets-go-chat
+web: main
