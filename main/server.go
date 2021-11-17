@@ -8,6 +8,7 @@ import (
 	"github.com/MaksymYesipov/hasher/hasher"
 	"github.com/google/uuid"
 	"net/http"
+	"os"
 )
 
 type User struct {
@@ -97,8 +98,14 @@ func generateAccessToken() string {
 }
 
 func main() {
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		fmt.Print("$PORT must be set")
+	}
+
 	http.Handle("/user", withJsonMimeType(http.HandlerFunc(createUser)))
 	http.Handle("/user/login", withJsonMimeType(http.HandlerFunc(login)))
 
-	http.ListenAndServe(":8090", nil)
+	http.ListenAndServe(":"+port, nil)
 }
