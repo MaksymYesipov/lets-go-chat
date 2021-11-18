@@ -7,37 +7,32 @@ import (
 	"fmt"
 	"github.com/MaksymYesipov/hasher/hasher"
 	"github.com/google/uuid"
+	"httpServer/model"
+	"httpServer/repository"
+	"httpServer/repository/domain"
 	"net/http"
-	"os"
 )
-
-type User struct {
-	UserName string
-	Password string
-}
-
-type UserBean struct {
-	Id       string
-	UserName string
-}
-
-type LoginResponse struct {
-	Url string
-}
 
 const url = "ws://fancy-chat.io/ws&token=%s"
 const tokenLength = 64
 
-var users = make(map[string]User)
+var repo repository.UserRepository
 
 func createUser(w http.ResponseWriter, req *http.Request) {
-	var u User
+	var u model.UserBean
 
 	err := json.NewDecoder(req.Body).Decode(&u)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	users, err := repo.GetAll()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	for _, v := range users {
 		if v.UserName == u.UserName {
 			http.Error(w, "User already exists", http.StatusBadRequest)
@@ -52,17 +47,26 @@ func createUser(w http.ResponseWriter, req *http.Request) {
 	}
 
 	uuidValue := uuid.New().String()
-	users[uuidValue] = u
-
-	userBean := UserBean{Id: uuidValue, UserName: u.UserName}
+	_, err = repo.Create(domain.User{ID: uuidValue, UserName: u.UserName, Password: u.Password})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	userBean := model.UserResponse{Id: uuidValue, UserName: u.UserName}
 	response, _ := json.Marshal(userBean)
 	fmt.Fprint(w, string(response))
 }
 
 func login(w http.ResponseWriter, req *http.Request) {
-	var u User
+	var u model.UserBean
 
 	err := json.NewDecoder(req.Body).Decode(&u)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	users, err := repo.GetAll()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -74,12 +78,12 @@ func login(w http.ResponseWriter, req *http.Request) {
 				http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 				return
 			}
-			responseData, _ := json.Marshal(LoginResponse{Url: fmt.Sprintf(url, generateAccessToken())})
+			responseData, _ := json.Marshal(model.LoginResponse{Url: fmt.Sprintf(url, generateAccessToken())})
 			fmt.Fprint(w, string(responseData))
 			return
 		}
-		http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 	}
+	http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 }
 
 func withJsonMimeType(next http.Handler) http.Handler {
@@ -98,14 +102,21 @@ func generateAccessToken() string {
 }
 
 func main() {
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		fmt.Print("$PORT must be set")
+	userRepository, err := repository.GetPostgresRepository()
+	if err != nil {
+		fmt.Printf("Can not connect to database: %s", err)
 	}
+	repo = userRepository
+	defer repo.CloseDB()
+
+	//port := os.Getenv("PORT")
+
+	//if port == "" {
+	//	fmt.Print("$PORT must be set")
+	//}
 
 	http.Handle("/user", withJsonMimeType(http.HandlerFunc(createUser)))
 	http.Handle("/user/login", withJsonMimeType(http.HandlerFunc(login)))
 
-	http.ListenAndServe(":"+port, nil)
+	http.ListenAndServe(":8090", nil)
 }
